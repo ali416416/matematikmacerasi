@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbaros'un 6. Sınıf Matematik Macerası</title>
+    <style>
+        /* Genel Stiller */
+        /* Body arka planı daha koyu bir toprak/harita tonu yapıldı */
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #c4bca3; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #4b4b4b; overflow: hidden; }
+        
+        /* Uygulama Konteyneri: Göz yormayan, daha koyu bir parşömen/bej tonu (#e5deb8) */
+        .app-container { background-color: #e5deb8; width: 100%; max-width: 1000px; height: 95vh; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; position: relative; }
+        
+        .header { background-color: #2b7a0b; color: white; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; border-bottom: 4px solid #1f5a08; z-index: 10; }
+
+        /* Bildirim (Toast) Sistemi */
+        .toast-container { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 1000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { padding: 12px 24px; border-radius: 12px; font-size: 16px; font-weight: bold; color: white; opacity: 0; transform: translateY(-20px); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: #58cc02; border-bottom: 3px solid #46a302; }
+        .toast.error { background-color: #ff4b4b; border-bottom: 3px solid #ea2b2b; }
+
+        /* DEKORATİF RESİM ALTYAPISI (Büyütüldü ve Üste Çıkarıldı) */
+        .corner-decor {
+            position: absolute;
+            width: 150px;  /* Boyut neredeyse iki katına çıkarıldı */
+            height: 150px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            z-index: 5; /* Soru tablosunun ve haritanın üstünde durur */
+            opacity: 0.35; /* Yazıları ve tabloyu kapatmaması için watermark şeffaflığı */
+            pointer-events: none; /* Tıklamaları engeller, altındaki tabloya tıklanabilir */
+        }
+        /* 6 Adet Dekorasyon Konumu */
+        .decor-1 { top: 20px; left: 10px; }
+        .decor-2 { top: 20px; right: 10px; }
+        .decor-3 { top: 40%; left: -20px; }
+        .decor-4 { top: 40%; right: -20px; }
+        .decor-5 { bottom: 110px; left: 10px; }
+        .decor-6 { bottom: 110px; right: 10px; }
+
+        /* HARİTA GÖRÜNÜMÜ */
+        #map-view { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 40px 20px 100px 20px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            background-color: transparent; 
+            position: relative;
+        }
+        
+        .map-title { font-size: 24px; font-weight: bold; color: #1f5a08; margin-bottom: 40px; text-align: center; background: rgba(255,255,255,0.85); padding: 10px 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 2; border: 1px solid #e5e5e5; }
+        
+        .level-node { width: 80px; height: 80px; border-radius: 50%; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 24px; font-weight: bold; color: white; position: relative; margin-bottom: 70px; cursor: pointer; transition: transform 0.2s; text-align: center; flex-shrink: 0; box-shadow: 0 6px 0 #c2821b; z-index: 2; }
+        .level-name { position: absolute; top: 90px; font-size: 14px; font-weight: bold; color: #4b4b4b; white-space: nowrap; background: rgba(255,255,255,0.9); padding: 6px 12px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border: 1px solid #e5e5e5; }
+        .level-node:active { transform: scale(0.9); box-shadow: 0 2px 0 #c2821b; margin-top: 4px; margin-bottom: 66px; }
+        .level-node:nth-child(odd) { transform: translateX(-50px); }
+        .level-node:nth-child(even) { transform: translateX(50px); }
+        .level-node::after { content: ''; position: absolute; top: 80px; width: 10px; height: 70px; background-color: #d1cbb0; z-index: -1; }
+        .level-node:nth-child(odd)::after { left: 50%; transform: rotate(-25deg); transform-origin: top; }
+        .level-node:nth-child(even)::after { right: 50%; transform: rotate(25deg); transform-origin: top; }
+        .level-node:last-child::after { display: none; }
+        
+        .node-locked { background-color: #dcd7c3; color: #afafaf; cursor: not-allowed; box-shadow: 0 6px 0 #c2bcab; }
+        .node-unlocked { background-color: #f5a623; animation: bounce 2s infinite; }
+        .node-completed { background-color: #58cc02; box-shadow: 0 6px 0 #58a700; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0) translateX(inherit); } 50% { transform: translateY(-10px) translateX(inherit); } }
+
+        /* BULMACA GÖRÜNÜMÜ */
+        #puzzle-view { 
+            display: none; 
+            flex: 1; 
+            flex-direction: column; 
+            background-color: transparent; 
+            position: relative;
+        }
+
+        .main-content { display: flex; flex-direction: column; padding: 20px; gap: 20px; flex: 1; overflow-y: auto; z-index: 2; position: relative;}
+        @media (min-width: 850px) { .main-content { flex-direction: row; } }
+        .crossword-board { flex: 1.5; display: flex; justify-content: center; align-items: flex-start; overflow-x: auto; overflow-y: auto; padding-bottom: 20px; }
+        .grid { display: grid; gap: 2px; background-color: rgba(75, 75, 75, 0.95); padding: 6px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);}
+        
+        .cell { width: 30px; height: 30px; background-color: white; border: 2px solid #cecece; border-radius: 4px; font-size: 18px; font-weight: bold; text-align: center; text-transform: uppercase; color: #4b4b4b; position: relative; outline: none; transition: all 0.3s; }
+        .cell:focus { border-color: #1cb0f6; background-color: #ddf4ff; }
+        .cell.correct { background-color: #d7ffb8; color: #58a700; border-color: #58cc02; }
+        .cell.wrong { background-color: #ffdfe0; color: #ea2b2b; border-color: #ff4b4b; animation: shake 0.3s; }
+        .cell.hint-cell { background-color: #e2f5d1; color: #1f5a08; border-color: #8bd450; cursor: not-allowed; }
+        .empty-cell { width: 34px; height: 34px; background-color: transparent; }
+        .cell-number { position: absolute; top: 0px; left: 2px; font-size: 11px; font-weight: bold; color: #1cb0f6; line-height: 1; letter-spacing: -0.5px; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-4px); } }
+
+        /* İpuçları Paneli */
+        .clues-panel { flex: 1; background-color: rgba(255,255,255,0.9); padding: 20px; border-radius: 12px; border: 2px solid #e5e5e5; max-height: 100%; overflow-y: auto; box-shadow: 0 10px 20px rgba(0,0,0,0.1); z-index: 2;}
+        .clue-list { list-style: none; padding: 0; margin: 0 0 20px 0; }
+        .clue-list li { margin-bottom: 15px; font-size: 14px; display: flex; gap: 10px; line-height: 1.4; }
+        .clue-num { font-weight: bold; color: #f5a623; min-width: 20px; font-size: 16px; }
+
+        /* Alt Kısım ve Mikrofon */
+        .footer { padding: 15px 20px; border-top: 2px solid #d1cbb0; display: flex; flex-direction: column; align-items: center; background: #fdfbf5; position: relative; z-index: 10;}
+        .mic-btn { background-color: #ff4b4b; color: white; border: none; border-bottom: 4px solid #ea2b2b; border-radius: 50%; width: 60px; height: 60px; font-size: 24px; cursor: pointer; transition: all 0.2s; display: flex; justify-content: center; align-items: center; margin-bottom: 10px; }
+        .mic-btn:active { transform: translateY(4px); border-bottom-width: 0; }
+        .mic-btn.listening { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 75, 75, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); } }
+        .mic-status { font-size: 15px; color: #afafaf; font-weight: bold; height: 20px; background: white; padding: 2px 10px; border-radius: 10px;}
+        .action-btn { background-color: #58cc02; color: white; border: none; border-radius: 12px; padding: 15px 40px; font-size: 20px; font-weight: bold; cursor: pointer; border-bottom: 4px solid #58a700; width: 100%; max-width: 350px; margin-top: 15px; display: none; animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 5; }
+        .action-btn:active { transform: translateY(4px); border-bottom-width: 0; margin-top: 19px; }
+        @keyframes popIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .close-btn { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.4); border: none; color: white; font-size: 20px; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; z-index: 20; display: none; }
+
+        /* SERTİFİKA EKRANI (Motivasyon Görseli Net, Tam Sığdırılmış ve YAZISIZ) */
+        #certificate-view { 
+            display: none; 
+            flex: 1; 
+            background-image: url('image_4.png'); 
+            background-position: center;
+            background-size: contain;
+            background-repeat: no-repeat;
+            position: relative; 
+            overflow: hidden; 
+            background-color: #e5deb8;
+        }
+        .confetti { position: absolute; width: 10px; height: 10px; background-color: #f0f0f0; animation: fall linear infinite; z-index: 5;}
+        @keyframes fall { to { transform: translateY(100vh) rotate(720deg); } }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header" id="header-title">Barbaros'un Macerası</div>
+    <button class="close-btn" id="close-btn" onclick="backToMap()">✖</button>
+    
+    <div class="toast-container" id="toast-container"></div>
+
+    <div id="map-view">
+        <div class="map-title">Sarmal Matematik Serüveni</div>
+        <div class="level-node" id="node-0" onclick="startLevel(0)"><span>1</span><div class="level-name">Gizemli Başlangıç</div></div>
+        <div class="level-node" id="node-1" onclick="startLevel(1)"><span>2</span><div class="level-name">Fısıldayan Orman</div></div>
+        <div class="level-node" id="node-2" onclick="startLevel(2)"><span>3</span><div class="level-name">Kayıp Vadi</div></div>
+        <div class="level-node" id="node-3" onclick="startLevel(3)"><span>4</span><div class="level-name">Kristal Mağara</div></div>
+        <div class="level-node" id="node-4" onclick="startLevel(4)"><span>5</span><div class="level-name">Sonsuz Çöl</div></div>
+        <div class="level-node" id="node-5" onclick="startLevel(5)"><span>6</span><div class="level-name">Gölgeler Geçidi</div></div>
+        <div class="level-node" id="node-6" onclick="startLevel(6)"><span>7</span><div class="level-name">Zirve Tapınağı</div></div>
+    </div>
+
+    <div id="puzzle-view">
+        <div class="main-content">
+            <div class="crossword-board"><div class="grid" id="grid"></div></div>
+            <div class="clues-panel">
+                <ul class="clue-list" id="across-clues"><strong>Soldan Sağa ➡️</strong></ul>
+                <ul class="clue-list" id="down-clues"><strong>Yukarıdan Aşağıya ⬇️</strong></ul>
+            </div>
+        </div>
+        <div class="footer">
+            <button id="mic-btn" class="mic-btn" title="Cevabı Sesli Söyle">🎤</button>
+            <div id="mic-status" class="mic-status">Kutuları doldur veya mikrofona cevabı söyle!</div>
+            <button id="next-map-btn" class="action-btn" onclick="completeLevel()">Haritaya Dön & İlerle</button>
+        </div>
+    </div>
+
+    <div id="certificate-view"></div>
+</div>
+
+<script>
+    // --- Senin Resim Dosyaların (1..jpg, 2..jpg vb.) Havuzu ---
+    const userImages = [
+        '1..jpg', '2..jpg', '3..jpg', '4..jpg', '5..jpg', '6..jpg', '8..jpg', '10..jpg'
+    ];
+
+    // --- Görünümlere Büyütülmüş Süslemeleri (6 adet) Ekleyen Fonksiyon ---
+    function applyCornerDecorations(viewId) {
+        const view = document.getElementById(viewId);
+        
+        // Varsa eski süslemeleri temizle
+        view.querySelectorAll('.corner-decor').forEach(el => el.remove());
+        
+        // Rastgele 6 resim seç (Havuzu yenileyerek)
+        let availableImages = [...userImages];
+        const positions = ['decor-1', 'decor-2', 'decor-3', 'decor-4', 'decor-5', 'decor-6'];
+        
+        for (let i = 0; i < 6; i++) {
+            // Eğer havuz biterse tekrar doldur (Mevcut resim sayısından fazla konum varsa diye)
+            if (availableImages.length === 0) availableImages = [...userImages]; 
+            
+            // Rastgele bir resim seç
+            const randIdx = Math.floor(Math.random() * availableImages.length);
+            const selectedImg = availableImages[randIdx];
+            availableImages.splice(randIdx, 1); // Seçileni havuzdan çıkar
+            
+            // Div oluştur, sınıflarını ata
+            const decorDiv = document.createElement('div');
+            decorDiv.className = `corner-decor ${positions[i]}`;
+            decorDiv.style.backgroundImage = `url('${selectedImg}')`;
+            
+            // Süslemelere daha doğal görünmeleri için rastgele hafif döndürme efekti (rotasyon) ekle
+            const randomRotation = Math.floor(Math.random() * 40) - 20; // -20 ile +20 derece arası
+            decorDiv.style.transform = `rotate(${randomRotation}deg)`;
+            
+            // Görünüme ekle
+            view.appendChild(decorDiv);
+        }
+    }
+
+    // --- SIFIR HATALI, BİRBİRİNE DEĞMEYEN KUSURSUZ KESİŞİM VERİLERİ (35 Benzersiz Kavram) ---
+    const levels = [
+        {
+            title: "1. Gizemli Başlangıç",
+            gridSize: 13,
+            hints: [{row: 2, col: 7}], // BİRİM 'İ' harfi ipucu
+            words: [
+                { id: 1, dir: 'H', word: 'KATSAYI', clue: 'Alınan ürünün fiyatı gibi, cebirsel ifadede değişkenin önündeki sayıya ne denir?', row: 4, col: 4 },
+                { id: 2, dir: 'V', word: 'ÇARPAN', clue: 'Bir yapbozun parçaları gibi, bir sayıyı kalansız bölebilen sayılara matematikte ne denir?', row: 0, col: 8 },
+                { id: 3, dir: 'V', word: 'ASAL', clue: 'Sadece 1\'e ve kendisine kalansız bölünebilen özel sayılara ne ad verilir?', row: 4, col: 5 },
+                { id: 4, dir: 'H', word: 'ORAN', clue: 'Kızların sayısını erkeklere bölmek gibi, iki çokluğun bölünerek karşılaştırılmasına ne ad verilir?', row: 6, col: 3 },
+                { id: 5, dir: 'V', word: 'DOĞRU', clue: 'Her iki yönden de sonsuza kadar uzayan düz çizgi modeline geometride ne denir?', row: 5, col: 3 },
+                { id: 6, dir: 'H', word: 'BİRİM', clue: 'Eşit parçalara ayrılmış bir bütünün sadece 1 dilimini gösteren kesre ne denir?', row: 2, col: 6 }
+            ]
+        },
+        {
+            title: "2. Fısıldayan Orman",
+            gridSize: 14,
+            hints: [{row: 7, col: 10}], // KÜP 'K' harfi ipucu
+            words: [
+                { id: 1, dir: 'V', word: 'DEĞİŞKEN', clue: 'Hava sıcaklığı gibi, cebirsel ifadelerde yerine farklı sayılar yazılabilen harflere ne denir?', row: 2, col: 4 },
+                { id: 2, dir: 'H', word: 'CEBİR', clue: 'İçinde harf ve işlem barındıran ifadelere matematikte genel olarak ne ad verilir?', row: 3, col: 3 },
+                { id: 3, dir: 'V', word: 'TERS', clue: 'Kesişen iki doğrunun oluşturduğu, köşeleri ortak ama yönleri tam zıt olan açılara ne denir?', row: 1, col: 7 },
+                { id: 4, dir: 'H', word: 'DİK', clue: 'Yere dikilen bir direğin zeminle oluşturduğu, ölçüsü tam 90 derece olan bu açıya ne denir?', row: 5, col: 3 },
+                { id: 5, dir: 'H', word: 'KÜP', clue: 'Tüm yüzeyleri birbirine eşit olan oyun zarı şeklindeki o özel cisme ne ad verilir?', row: 7, col: 4 },
+                { id: 6, dir: 'V', word: 'PRİZMA', clue: 'Alt ve üst tabanları birbirine paralel çokgenlerden oluşan üç boyutlu cisimlere ne denir?', row: 7, col: 6 }
+            ]
+        },
+        {
+            title: "3. Kayıp Vadi",
+            gridSize: 13,
+            hints: [{row: 9, col: 6}], // HACİM 'İ' harfi ipucu
+            words: [
+                { id: 1, dir: 'H', word: 'BÜTÜNLER', clue: 'Yan yana geldiklerinde ölçüleri toplamı tam bir doğru açı (180 derece) eden iki açıya ne denir?', row: 4, col: 2 },
+                { id: 2, dir: 'V', word: 'KÜME', clue: 'Aynı özelliği taşıyan varlıkların oluşturduğu iyi tanımlanmış matematiksel topluluğa ne denir?', row: 3, col: 3 },
+                { id: 3, dir: 'V', word: 'NEGATİF', clue: 'Deniz seviyesinin altını göstermek için kullandığımız, eksi işaretli tam sayılara ne ad verilir?', row: 4, col: 6 },
+                { id: 4, dir: 'V', word: 'VERİ', clue: 'Bir araştırma sorusu sonucunda toplanan ham bilgilerin her birine ne denir?', row: 3, col: 8 },
+                { id: 5, dir: 'H', word: 'HACİM', clue: 'Bir havuzun veya deponun uzayda (boşlukta) kapladığı o toplam yere ne ad verilir?', row: 9, col: 3 },
+                { id: 6, dir: 'V', word: 'ÇAP', clue: 'Çemberin bir kıyısından girip tam merkezinden geçerek diğer kıyıya ulaşan en uzun çizgiye ne denir?', row: 8, col: 4 }
+            ]
+        },
+        {
+            title: "4. Kristal Mağara",
+            gridSize: 14,
+            hints: [{row: 4, col: 9}], // KARE 'A' harfi ipucu
+            words: [
+                { id: 1, dir: 'H', word: 'ORTALAMA', clue: 'Veri grubundaki tüm sayıları toplayıp kişi sayısına bölerek bulduğumuz değere ne denir?', row: 4, col: 2 },
+                { id: 2, dir: 'V', word: 'KOMŞU', clue: 'Köşeleri ve birer kolları tamamen ortak olan, yan yana duran açılara ne denir?', row: 3, col: 2 },
+                { id: 3, dir: 'H', word: 'TEK', clue: 'Sonu 1, 3, 5, 7 veya 9 ile biten, ikiye tam bölünemeyen sayılara ne ad verilir?', row: 3, col: 0 },
+                { id: 4, dir: 'V', word: 'BÜTÜN', clue: 'Kesirlerde, hiçbir parçaya ayrılmamış tam ve eksiksiz olan duruma ne ad verilir?', row: 2, col: 4 },
+                { id: 5, dir: 'V', word: 'PAY', clue: 'Bir pastadan kaç dilim yediğimizi gösteren ve kesir çizgisinin üstüne yazılan sayıya ne denir?', row: 3, col: 7 },
+                { id: 6, dir: 'V', word: 'KARE', clue: 'Dört kenarı ve dört açısı birbirine tam eşit olan o özel dörtgene geometride ne denir?', row: 3, col: 9 },
+                { id: 7, dir: 'H', word: 'KESİR', clue: 'Bir bütünün eş parçalarından birini gösteren (pay ve paydası olan) sayıya ne denir?', row: 6, col: 8 }
+            ]
+        },
+        {
+            title: "5. Sonsuz Çöl",
+            gridSize: 13,
+            hints: [{row: 8, col: 4}], // YÜZEY 'Z' harfi ipucu
+            words: [
+                { id: 1, dir: 'H', word: 'AÇIKLIK', clue: 'En sıcak ile en soğuk gün arasındaki fark gibi, veri grubundaki en büyük ve en küçük değerin farkına ne denir?', row: 4, col: 2 },
+                { id: 2, dir: 'V', word: 'DAR', clue: 'Ölçüsü dik açıdan (90 dereceden) daha kapalı ve küçük olan açılara ne ad verilir?', row: 3, col: 2 },
+                { id: 3, dir: 'V', word: 'TABLO', clue: 'Topladığımız verileri daha kolay okuyabilmek için satır ve sütunlar halinde düzenlediğimiz çizelgeye ne denir?', row: 1, col: 6 },
+                { id: 4, dir: 'V', word: 'DENK', clue: '1/2 ile 2/4 gibi, aynı büyüklüğü gösteren fakat farklı yazılan kesirlere ne ad verilir?', row: 1, col: 8 },
+                { id: 5, dir: 'H', word: 'YÜZEY', clue: 'Üç boyutlu cisimlerin dışını kaplayan ve elimizle dokunabildiğimiz düzlemsel kısımlara ne denir?', row: 8, col: 2 }
+            ]
+        },
+        {
+            title: "6. Gölgeler Geçidi",
+            gridSize: 13,
+            hints: [{row: 6, col: 4}], // ALAN 'A' harfi ipucu
+            words: [
+                { id: 1, dir: 'H', word: 'ONDALIK', clue: 'Kesirlerin virgül kullanılarak (örneğin 2,5 şeklinde) yazıldığı gösterime ne ad verilir?', row: 3, col: 2 },
+                { id: 2, dir: 'V', word: 'PAYDA', clue: 'Bütün bir pastayı böldüğümüzde toplam dilim sayısını gösteren, kesrin altındaki sayıya ne denir?', row: 0, col: 4 },
+                { id: 3, dir: 'V', word: 'ORTAK', clue: 'İki farklı sayının bölenlerini incelediğimizde, her ikisinde de aynı olan sayılara ne denir?', row: 3, col: 2 },
+                { id: 4, dir: 'H', word: 'ALAN', clue: 'Gölün su yüzeyinin düzlemde kapladığı o toplam iki boyutlu büyüklüğü ifade eden kavrama ne denir?', row: 6, col: 2 },
+                { id: 5, dir: 'H', word: 'YÜZDE', clue: 'Bir çokluğu 100 eş parçaya bölüp sembolle (%) gösterdiğimiz kesir türüne ne ad verilir?', row: 8, col: 4 }
+            ]
+        },
+        {
+            title: "7. Zirve Tapınağı",
+            gridSize: 13,
+            hints: [{row: 6, col: 6}], // BOŞ 'O' harfi ipucu
+            words: [
+                { id: 1, dir: 'H', word: 'BİRİMKÜP', clue: 'Hacim ölçmek için kullandığımız, her ayrıtının uzunluğu tam 1 birim olan o küçük küplere ne ad verilir?', row: 2, col: 2 },
+                { id: 2, dir: 'V', word: 'CİSİM', clue: 'Eni, boyu ve yüksekliği olup uzayda hacim kaplayan üç boyutlu geometrik şekillere genel olarak ne denir?', row: 1, col: 3 },
+                { id: 3, dir: 'V', word: 'KESİŞİM', clue: 'İki kümenin sadece ortak olan elemanlarından oluşan ve ters U (∩) ile gösterilen o yeni kümeye ne denir?', row: 2, col: 7 },
+                { id: 4, dir: 'H', word: 'BOŞ', clue: 'İçinde hiçbir elemanı bulunmayan kümeleri ifade ederken küme kelimesinin önüne ne getirilir?', row: 6, col: 5 },
+                { id: 5, dir: 'H', word: 'AYRIT', clue: 'Geometrik cisimlerde iki yüzeyin birleştiği o düz ve keskin çizgilere (kenarlara) matematikte ne ad verilir?', row: 10, col: 2 }
+            ]
+        }
+    ];
+
+    let currentLevelIndex = 0;
+    let unlockedLevels = 0;
+    let gridMap = [];
+    let wordStatusMap = {}; 
+
+    const mapView = document.getElementById('map-view');
+    const puzzleView = document.getElementById('puzzle-view');
+    const headerTitle = document.getElementById('header-title');
+    const gridContainer = document.getElementById('grid');
+    const micBtn = document.getElementById('mic-btn');
+    const micStatus = document.getElementById('mic-status');
+    const nextMapBtn = document.getElementById('next-map-btn');
+    const certView = document.getElementById('certificate-view');
+    const toastContainer = document.getElementById('toast-container');
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playSound(type) {
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if (type === 'correct') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        } else if (type === 'wrong') {
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+        } else if (type === 'win') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime + 0.1); osc.frequency.setValueAtTime(800, audioCtx.currentTime + 0.2);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+        }
+    }
+
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function normalizeText(text) {
+        return text.replace(/i/g, 'İ').replace(/ı/g, 'I').toLocaleUpperCase('tr-TR');
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = 'tr-TR';
+        recognition.continuous = false;
+        recognition.onstart = () => { micBtn.classList.add("listening"); micStatus.textContent = "Dinliyorum... Cevabı söyleyin."; micStatus.style.color = "#ea2b2b"; };
+        recognition.onresult = (event) => { 
+            const transcript = normalizeText(event.results[0][0].transcript).trim(); 
+            micStatus.textContent = `Duyulan: "${transcript}"`; 
+            micStatus.style.color = "#4b4b4b"; 
+            checkSpokenWord(transcript); 
+        };
+        recognition.onerror = () => { micStatus.textContent = "Ses anlaşılamadı. Tekrar deneyin."; };
+        recognition.onend = () => { micBtn.classList.remove("listening"); };
+        micBtn.onclick = () => { if(audioCtx.state === 'suspended') audioCtx.resume(); recognition.start(); };
+    } else {
+        micStatus.textContent = "Tarayıcın sesli yanıtı desteklemiyor. Klavyeyi kullanın.";
+    }
+
+    function updateMapUI() {
+        for (let i = 0; i < levels.length; i++) {
+            const node = document.getElementById(`node-${i}`);
+            if(!node) continue;
+            node.className = 'level-node'; 
+            if (i < unlockedLevels) { node.classList.add('node-completed'); node.querySelector('span').innerHTML = "✔"; } 
+            else if (i === unlockedLevels) { node.classList.add('node-unlocked'); node.querySelector('span').innerHTML = i + 1; } 
+            else { node.classList.add('node-locked'); node.querySelector('span').innerHTML = "🔒"; }
+        }
+    }
+
+    function startLevel(levelIndex) {
+        if (levelIndex > unlockedLevels) return; 
+        currentLevelIndex = levelIndex;
+        wordStatusMap = {}; 
+        
+        mapView.style.display = 'none';
+        puzzleView.style.display = 'flex';
+        
+        // Bulmaca Ekranına Süslemeleri Ekle
+        applyCornerDecorations('puzzle-view');
+
+        document.getElementById('close-btn').style.display = 'block';
+        headerTitle.textContent = levels[currentLevelIndex].title;
+        nextMapBtn.style.display = 'none';
+        micBtn.style.display = 'flex';
+        micStatus.textContent = "Kutuları doldur veya mikrofona cevabı söyle!";
+        
+        buildCrossword();
+    }
+
+    function backToMap() {
+        puzzleView.style.display = 'none'; 
+        mapView.style.display = 'flex'; 
+        document.getElementById('close-btn').style.display = 'none'; 
+        headerTitle.textContent = "Barbaros'un Macerası: 6. Sınıf"; 
+        
+        // Ana Haritaya Süslemeleri Yeniden Ekle
+        applyCornerDecorations('map-view');
+        
+        updateMapUI();
+    }
+
+    function buildCrossword() {
+        const levelData = levels[currentLevelIndex];
+        const size = levelData.gridSize;
+        gridContainer.style.gridTemplateColumns = `repeat(${size}, 30px)`;
+        gridContainer.innerHTML = '';
+        gridMap = Array(size).fill(null).map(() => Array(size).fill(null));
+
+        levelData.words.forEach(item => {
+            wordStatusMap[item.id] = 'incomplete'; 
+            let r = item.row, c = item.col;
+            for (let i = 0; i < item.word.length; i++) {
+                if (r >= 0 && r < size && c >= 0 && c < size) {
+                    if (!gridMap[r][c]) gridMap[r][c] = { letter: item.word[i], numbers: [], words: [] };
+                    if (i === 0) gridMap[r][c].numbers.push(item.id);
+                    gridMap[r][c].words.push(item.word);
+                }
+                if (item.dir === 'H') c++; else r++;
+            }
+        });
+
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                const cellData = gridMap[r][c];
+                if (cellData) {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.position = 'relative';
+                    const input = document.createElement('input');
+                    input.type = 'text'; input.maxLength = 1; input.className = 'cell'; input.dataset.row = r; input.dataset.col = c;
+                    input.dataset.answer = normalizeText(cellData.letter); input.dataset.words = JSON.stringify(cellData.words);
+
+                    const isHint = levelData.hints && levelData.hints.some(h => h.row === r && h.col === c);
+                    if (isHint) { input.value = input.dataset.answer; input.classList.add('correct', 'hint-cell'); input.readOnly = true; }
+                    
+                    input.addEventListener('input', function() { 
+                        this.value = normalizeText(this.value); 
+                        evaluateBoard(); 
+                    });
+                    
+                    wrapper.appendChild(input);
+
+                    if (cellData.numbers.length > 0) {
+                        const numLabel = document.createElement('span'); numLabel.className = 'cell-number'; numLabel.textContent = cellData.numbers.join(','); wrapper.appendChild(numLabel);
+                    }
+                    gridContainer.appendChild(wrapper);
+                } else {
+                    const empty = document.createElement('div'); empty.className = 'empty-cell'; gridContainer.appendChild(empty);
+                }
+            }
+        }
+
+        document.getElementById('across-clues').innerHTML = '<strong>Soldan Sağa ➡️</strong>';
+        document.getElementById('down-clues').innerHTML = '<strong>Yukarıdan Aşağıya ⬇️</strong>';
+        levelData.words.forEach(item => {
+            const li = document.createElement('li'); li.innerHTML = `<span class="clue-num">${item.id}.</span> <span>${item.clue}</span>`;
+            if (item.dir === 'H') document.getElementById('across-clues').appendChild(li); else document.getElementById('down-clues').appendChild(li);
+        });
+        evaluateBoard(true); 
+    }
+
+    function checkSpokenWord(spokenWord) {
+        const levelData = levels[currentLevelIndex];
+        const matchedWord = levelData.words.find(w => normalizeText(w.word) === spokenWord);
+        if (matchedWord) {
+            const inputs = document.querySelectorAll('.cell');
+            inputs.forEach(input => {
+                const associatedWords = JSON.parse(input.dataset.words);
+                if (associatedWords.some(w => normalizeText(w) === spokenWord)) {
+                    input.value = input.dataset.answer;
+                }
+            });
+            evaluateBoard();
+        } else {
+            showToast(`Söylediğin "${spokenWord}" kelimesi bu bulmacada yok!`, "error");
+            playSound('wrong');
+        }
+    }
+
+    function evaluateBoard(isInitial = false) {
+        const allInputs = document.querySelectorAll('.cell');
+        const levelData = levels[currentLevelIndex];
+        
+        allInputs.forEach(cell => {
+            if (!cell.classList.contains('hint-cell')) {
+                cell.classList.remove('correct', 'wrong');
+            }
+        });
+
+        let allWordsCorrect = true;
+
+        levelData.words.forEach(item => {
+            let typedWord = "";
+            let wordCells = [];
+            let isFilled = true;
+
+            let r = item.row, c = item.col;
+            for (let i = 0; i < item.word.length; i++) {
+                const cell = Array.from(allInputs).find(inp => parseInt(inp.dataset.row) === r && parseInt(inp.dataset.col) === c);
+                if (cell) {
+                    wordCells.push(cell);
+                    if (cell.value === "") isFilled = false;
+                    typedWord += cell.value;
+                }
+                if (item.dir === 'H') c++; else r++;
+            }
+
+            if (isFilled) {
+                if (typedWord === normalizeText(item.word)) {
+                    wordCells.forEach(cell => {
+                        if (!cell.classList.contains('hint-cell')) cell.classList.add('correct');
+                        cell.classList.remove('wrong');
+                    });
+                    
+                    if (wordStatusMap[item.id] !== 'correct') {
+                        wordStatusMap[item.id] = 'correct';
+                        if (!isInitial) {
+                            showToast(`Harika! ${item.word} doğru cevap.`, 'success');
+                            playSound('correct');
+                        }
+                    }
+                } else {
+                    wordCells.forEach(cell => {
+                        if (!cell.classList.contains('hint-cell') && !cell.classList.contains('correct')) {
+                            cell.classList.add('wrong');
+                        }
+                    });
+                    
+                    if (wordStatusMap[item.id] !== 'wrong') {
+                        wordStatusMap[item.id] = 'wrong';
+                        if (!isInitial) {
+                            showToast(`Hatalı kelime! Lütfen kırmızı kutuları düzelt.`, 'error');
+                            playSound('wrong');
+                        }
+                    }
+                    allWordsCorrect = false;
+                }
+            } else {
+                wordStatusMap[item.id] = 'incomplete';
+                allWordsCorrect = false;
+            }
+        });
+
+        if (allWordsCorrect && !isInitial) {
+            playSound('win'); 
+            micStatus.textContent = "🎉 Harita Tamamlandı! Diğer bölgeye geçebiliriz! 🎉"; 
+            micBtn.style.display = 'none'; 
+            nextMapBtn.style.display = 'block';
+            if (currentLevelIndex === levels.length - 1) nextMapBtn.textContent = "Sertifikanı Al! 🏆"; else nextMapBtn.textContent = "Haritaya Dön & İlerle";
+        } else {
+            nextMapBtn.style.display = 'none';
+        }
+    }
+
+    function completeLevel() {
+        if (unlockedLevels === currentLevelIndex) unlockedLevels++;
+        if (currentLevelIndex === levels.length - 1) showCertificate(); else backToMap();
+    }
+
+    function showCertificate() {
+        document.getElementById('close-btn').style.display = 'none'; puzzleView.style.display = 'none'; mapView.style.display = 'none'; certView.style.display = 'flex'; headerTitle.textContent = "Zafer!"; createConfetti();
+    }
+
+    function createConfetti() {
+        const colors = ['#f5a623', '#58cc02', '#1cb0f6', '#ff4b4b', '#fff'];
+        for (let i = 0; i < 150; i++) {
+            let conf = document.createElement('div'); conf.classList.add('confetti'); conf.style.left = Math.random() * 100 + 'vw'; conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)]; conf.style.animationDuration = (Math.random() * 3 + 2) + 's'; conf.style.animationDelay = (Math.random() * 2) + 's'; certView.appendChild(conf);
+        }
+    }
+
+    // İlk açılışta ana haritaya süslemeleri uygula
+    applyCornerDecorations('map-view');
+    updateMapUI();
+</script>
+</body>
+</html>
